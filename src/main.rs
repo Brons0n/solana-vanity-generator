@@ -501,19 +501,18 @@ struct DeviceInfo {
 #[cfg(feature = "gpu")]
 fn detect_gpu() -> Vec<DeviceInfo> {
     let mut devices = Vec::new();
-    if let Ok(platforms) = Platform::list_full() {
-        for (pi, platform) in platforms.iter().enumerate() {
-            if let Ok(devs) = Device::list_all(platform) {
-                for (di, dev) in devs.iter().enumerate() {
-                    let name = dev.name().unwrap_or_else(|_| "Unknown".to_string());
-                    let vendor = dev.vendor().unwrap_or_else(|_| "Unknown".to_string());
-                    devices.push(DeviceInfo {
-                        platform_idx: pi,
-                        device_idx: di,
-                        name,
-                        vendor,
-                    });
-                }
+    let platforms = Platform::list();
+    for (pi, platform) in platforms.iter().enumerate() {
+        if let Ok(devs) = Device::list_all(platform) {
+            for (di, dev) in devs.iter().enumerate() {
+                let name = dev.name().unwrap_or_else(|_| "Unknown".to_string());
+                let vendor = dev.vendor().unwrap_or_else(|_| "Unknown".to_string());
+                devices.push(DeviceInfo {
+                    platform_idx: pi,
+                    device_idx: di,
+                    name,
+                    vendor,
+                });
             }
         }
     }
@@ -525,10 +524,7 @@ fn benchmark_gpu(device: &DeviceInfo, duration: Duration) -> f64 {
     let global_size = 4096usize;
     let batch = 512u64;
 
-    let platforms = match Platform::list_full() {
-        Ok(p) => p,
-        Err(_) => return 0.0,
-    };
+    let platforms = Platform::list();
     let platform = match platforms.get(device.platform_idx) {
         Some(p) => *p,
         None => return 0.0,
@@ -734,7 +730,7 @@ fn gpu_worker(
     let global_size = 8192usize;
     let batch_size = 512u64;
 
-    let platforms = Platform::list_full().ok()?;
+    let platforms = Platform::list();
     let platform = *platforms.get(device.platform_idx)?;
     let devs = Device::list_all(&platform).ok()?;
     let dev = *devs.get(device.device_idx)?;
@@ -809,10 +805,17 @@ fn gpu_worker(
         .build()
         .ok()?;
 
+    let mut current_seed = seed;
+
     loop {
         if found_flag.load(Ordering::Relaxed) {
             return None;
         }
+
+        // Advance the seed each batch so different keys are generated each iteration.
+        kernel.set_arg(8u32, current_seed).ok()?;
+        current_seed = current_seed.wrapping_add(global_size as u64);
+
         unsafe {
             kernel.enq().ok()?;
         }
@@ -1003,13 +1006,17 @@ fn main() {
     let use_gpu = !cli.cpu_only && gpu_speed > cpu_speed;
     let _ = use_gpu; // suppress warning when gpu feature off
 
-    let result: Option<(String, String, Vec<u8>)>;
+    let mut result: Option<(String, String, Vec<u8>)>;
 
     #[cfg(feature = "gpu")]
     {
         if use_gpu && selected_gpu.is_some() {
             let dev = &gpu_devices[0];
             result = gpu_worker(dev, &prefix, &suffix, case_insensitive, counter.clone(), found.clone());
+            if result.is_none() && !found.load(Ordering::Relaxed) {
+                // GPU failed before finding anything — fall back to CPU.
+                result = cpu_worker(&prefix, &suffix, case_insensitive, threads, counter.clone(), found.clone());
+            }
         } else {
             result = cpu_worker(&prefix, &suffix, case_insensitive, threads, counter.clone(), found.clone());
         }
