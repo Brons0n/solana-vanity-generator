@@ -40,18 +40,21 @@ Output saves to `keypair.json` (64-byte secret+public, compatible with Solana CL
 
 Solana addresses are base58 (58 possible characters per position). Each character you add multiplies difficulty by 58.
 
-| Length | Avg attempts | CPU ~5M/s | GPU ~200M/s |
-|--------|-------------|-----------|-------------|
-| 1 | ~29 | <1s | <1s |
-| 2 | ~1,700 | <1s | <1s |
-| 3 | ~97K | <1s | <1s |
-| 4 | ~5.6M | ~1s | <1s |
-| 5 | ~324M | ~1m | ~2s |
-| 6 | ~18.8B | ~1h | ~1.5m |
-| 7 | ~1.1T | ~2.5d | ~1.5h |
-| 8 | ~63T | ~145d | ~4d |
+| Length | Avg attempts |
+|--------|-------------|
+| 1 | ~29 |
+| 2 | ~1,700 |
+| 3 | ~97K |
+| 4 | ~5.6M |
+| 5 | ~324M |
+| 6 | ~18.8B |
+| 7 | ~1.1T |
+| 8 | ~63T |
 
 > Invalid characters (0, O, I, l) are not in base58 — the tool will warn you if your prefix contains them.
+
+## Support :)
+(SOL) 4ZAsLqygvpoqgmzmH54pwEipU5QZdxSkXXLnmBDGqVka
 
 ## License
 
